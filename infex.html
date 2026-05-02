@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tetris Advanced Physics Pro</title>
+    <style>
+        body { 
+            background: #0f0c29; 
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
+            color: #fff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            margin: 0; 
+            overflow: hidden; 
+            height: 100vh;
+        }
+        .game-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 15px;
+            width: 95%;
+            /* O'yin ekrani va yon panellar bir xil balandlikda bo'lishi uchun */
+            height: 55vh; 
+        }
+        canvas#tetris { 
+            border: 3px solid #4834d4; 
+            background: rgba(0,0,0,0.9);
+            box-shadow: 0 0 20px rgba(72, 52, 212, 0.4);
+            height: 100%; /* Konteynerga moslashadi */
+        }
+        .side-panels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* Panellarni bo'y bo'ylab tekis taqsimlaydi */
+            width: 120px;
+            height: 100%;
+        }
+        .panel {
+            background: rgba(22, 33, 62, 0.95);
+            border: 2px solid #4834d4;
+            border-radius: 10px;
+            padding: 4px;
+            text-align: center;
+            flex-grow: 1; /* Bo'sh joyni to'ldiradi */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 4px;
+        }
+        .panel:last-child { margin-bottom: 0; }
+        .panel h3 { font-size: 11px; margin: 2px 0; color: #00d2ff; text-transform: uppercase; }
+        .val { font-size: 18px; font-weight: bold; color: #fff; }
+        
+        .speed-ctrl { display: flex; justify-content: center; align-items: center; gap: 8px; }
+        .speed-btn { background: #4834d4; border: none; color: white; width: 30px; height: 30px; border-radius: 5px; font-size: 20px; font-weight: bold; }
+
+        /* Boshqaruv tugmalari - Kattalashtirilgan */
+        .controls-area {
+            position: absolute;
+            bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            gap: 15px;
+        }
+        .btn-row { display: flex; gap: 20px; }
+        .btn {
+            background: #1e272e;
+            border: 2px solid #4834d4;
+            color: white;
+            border-radius: 18px;
+            touch-action: manipulation;
+            box-shadow: 0 6px 0 #0f1418;
+            font-weight: bold;
+        }
+        .btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #0f1418; }
+        .btn-large { width: 260px; height: 65px; font-size: 22px; background: #eb4d4b; border-color: #ff7979; }
+        .btn-square { width: 90px; height: 80px; font-size: 30px; }
+        .btn-pasga { width: 110px; height: 90px; background: #00d2ff; color: #000; font-size: 20px; }
+
+        #nextCanvas { background: #000; margin: 0 auto; display: block; }
+    </style>
+</head>
+<body>
+
+    <div class="game-wrapper">
+        <canvas id="tetris" width="240" height="400"></canvas>
+        
+        <div class="side-panels">
+            <div class="panel">
+                <h3>I. NEXT</h3>
+                <canvas id="nextCanvas" width="60" height="60"></canvas>
+            </div>
+
+            <div class="panel">
+                <h3>II. SCORE</h3>
+                <div id="score" class="val">0</div>
+                <div style="font-size: 9px; color: #aaa; margin-top: 5px;">BEST: <span id="best">0</span></div>
+            </div>
+
+            <div class="panel">
+                <h3>III. TEZLIK</h3>
+                <div class="speed-ctrl">
+                    <button class="speed-btn" onclick="adjustSpeed(-1)">-</button>
+                    <span id="speedLevel" class="val">1</span>
+                    <button class="speed-btn" onclick="adjustSpeed(1)">+</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>IV. OVOZ</h3>
+                <button id="soundBtn" style="background:#2ecc71; border:none; color:white; border-radius:5px; padding:6px; font-weight:bold;" onclick="toggleSound()">YOQIK</button>
+            </div>
+
+            <div class="panel">
+                <h3>V. ACTION</h3>
+                <button onclick="pauseGame()" style="background:#f39c12; border:none; width:90%; color:white; border-radius:5px; padding:5px; margin: 2px auto;">PAUZA</button>
+                <button onclick="resetGame()" style="background:#e74c3c; border:none; width:90%; color:white; border-radius:5px; padding:5px; margin: 2px auto;">RESTART</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-area">
+        <button class="btn btn-large" onclick="handleRotate()">↻ AYLANTIRISH</button>
+        <div class="btn-row">
+            <button class="btn btn-square" onclick="handleMove(-1)">←</button>
+            <button class="btn btn-pasga" onclick="handleHardDrop()">⚡<br>PASGA</button>
+            <button class="btn btn-square" onclick="handleMove(1)">→</button>
+        </div>
+    </div>
+
+    <audio id="bgMusic" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"></audio>
+    <audio id="moveSnd" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"></audio>
+    <audio id="breakSnd" src="https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3"></audio>
+
+    <script>
+        const canvas = document.getElementById('tetris');
+        const context = canvas.getContext('2d');
+        const nextCanvas = document.getElementById('nextCanvas');
+        const nextCtx = nextCanvas.getContext('2d');
+        
+        context.scale(20, 20);
+        nextCtx.scale(15, 15);
+
+        let isPaused = false;
+        let soundOn = true;
+        let speed = 1;
+        let dropInterval = 280;
+        let pieces_broken = []; 
+
+        const colors = [
+            null,
+            { main: '#FF0D72', light: '#ff5e95', dark: '#b3004b' }, // I
+            { main: '#0DC2FF', light: '#70d9ff', dark: '#0086b3' }, // L
+            { main: '#0DFF72', light: '#75ff9e', dark: '#00b347' }, // J
+            { main: '#F538FF', light: '#f985ff', dark: '#a600ad' }, // O
+            { main: '#FF8E0D', light: '#ffb561', dark: '#b36200' }, // Z
+            { main: '#FFE138', light: '#fff085', dark: '#b39c00' }, // S
+            { main: '#3877FF', light: '#85aaff', dark: '#0047b3' }, // T
+        ];
+
+        function drawBlock(ctx, x, y, colorIdx) {
+            const color = colors[colorIdx];
+            // Asosiy rang
+            ctx.fillStyle = color.main;
+            ctx.fillRect(x, y, 1, 1);
+            
+            // Effektlar (avvalgi chiroyli ko'rinish)
+            ctx.fillStyle = color.light;
+            ctx.fillRect(x, y, 1, 0.1);
+            ctx.fillRect(x, y, 0.1, 1);
+            
+            ctx.fillStyle = color.dark;
+            ctx.fillRect(x, y + 0.9, 1, 0.1);
+            ctx.fillRect(x + 0.9, y, 0.1, 1);
+
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.lineWidth = 0.05;
+            ctx.strokeRect(x, y, 1, 1);
+        }
+
+        class BrokenPiece {
+            constructor(x, y, colorIdx) {
+                this.x = x; this.y = y; this.colorIdx = colorIdx;
+                this.vy = 0.25; 
+                this.targetY = 21; 
+                this.life = 120;
+            }
+            update() {
+                if(this.y < this.targetY) this.y += this.vy;
+                this.life--;
+            }
+            draw() {
+                context.save();
+                context.globalAlpha = this.life / 120;
+                drawBlock(context, this.x, this.y, this.colorIdx);
+                context.restore();
+            }
+        }
+
+        function createPiece(type) {
+            if (type === 'I') return [[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0]];
+            if (type === 'L') return [[0, 0, 2], [2, 2, 2], [0, 0, 0]];
+            if (type === 'J') return [[3, 0, 0], [3, 3, 3], [0, 0, 0]];
+            if (type === 'O') return [[4, 4], [4, 4]];
+            if (type === 'Z') return [[5, 5, 0], [0, 5, 5], [0, 0, 0]];
+            if (type === 'S') return [[0, 6, 6], [6, 6, 0], [0, 0, 0]];
+            if (type === 'T') return [[0, 7, 0], [7, 7, 7], [0, 0, 0]];
+        }
+
+        function arenaSweep() {
+            outer: for (let y = arena.length - 1; y > 0; --y) {
+                for (let x = 0; x < arena[y].length; ++x) {
+                    if (arena[y][x] === 0) continue outer;
+                }
+                for(let x=0; x<arena[y].length; x++) {
+                    pieces_broken.push(new BrokenPiece(x, y, arena[y][x]));
+                }
+                const row = arena.splice(y, 1)[0].fill(0);
+                arena.unshift(row);
+                ++y;
+                player.score += 10;
+                if(soundOn) document.getElementById('breakSnd').play();
+            }
+            updateScore();
+        }
+
+        function collide(arena, player) {
+            const [m, o] = [player.matrix, player.pos];
+            for (let y = 0; y < m.length; ++y) {
+                for (let x = 0; x < m[y].length; ++x) {
+                    if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) return true;
+                }
+            }
+            return false;
+        }
+
+        function merge(arena, player) {
+            player.matrix.forEach((row, y) => {
+                row.forEach((val, x) => {
+                    if (val !== 0) arena[y + player.pos.y][x + player.pos.x] = val;
+                });
+            });
+        }
+
+        function playerDrop() {
+            player.pos.y++;
+            if (collide(arena, player)) {
+                player.pos.y--;
+                merge(arena, player);
+                playerReset();
+                arenaSweep();
+            }
+            dropCounter = 0;
+        }
+
+        let nextPiece = createPiece('T');
+        function playerReset() {
+            const pieces = 'TJLOSZI';
+            player.matrix = nextPiece;
+            nextPiece = createPiece(pieces[Math.random() * pieces.length | 0]);
+            player.pos.y = 0;
+            player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+            if (collide(arena, player)) {
+                arena.forEach(row => row.fill(0));
+                player.score = 0;
+                updateScore();
+            }
+            drawNext();
+        }
+
+        function drawNext() {
+            nextCtx.fillStyle = '#000';
+            nextCtx.fillRect(0,0,60,60);
+            nextPiece.forEach((row, y) => {
+                row.forEach((val, x) => {
+                    if(val !== 0) drawBlock(nextCtx, x + 1, y + 1, val);
+                });
+            });
+        }
+
+        function update(time = 0) {
+            if(!isPaused) {
+                const deltaTime = time - lastTime;
+                lastTime = time;
+                dropCounter += deltaTime;
+                if (dropCounter > dropInterval) playerDrop();
+                
+                context.fillStyle = '#000';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                arena.forEach((row, y) => {
+                    row.forEach((val, x) => {
+                        if(val !== 0) drawBlock(context, x, y, val);
+                    });
+                });
+                player.matrix.forEach((row, y) => {
+                    row.forEach((val, x) => {
+                        if(val !== 0) drawBlock(context, x + player.pos.x, y + player.pos.y, val);
+                    });
+                });
+
+                pieces_broken.forEach((p, i) => {
+                    p.update(); p.draw();
+                    if(p.life <= 0) pieces_broken.splice(i, 1);
+                });
+            }
+            requestAnimationFrame(update);
+        }
+
+        // Boshqaruv funksiyalari
+        function toggleSound() {
+            soundOn = !soundOn;
+            const btn = document.getElementById('soundBtn');
+            btn.innerText = soundOn ? "YOQIK" : "OCHIK";
+            btn.style.background = soundOn ? "#2ecc71" : "#95a5a6";
+            if(soundOn) document.getElementById('bgMusic').play();
+            else document.getElementById('bgMusic').pause();
+        }
+        function adjustSpeed(val) {
+            speed = Math.max(1, Math.min(11, speed + val));
+            document.getElementById('speedLevel').innerText = speed;
+            dropInterval = 290 - (speed * 10);
+        }
+        function updateScore() {
+            document.getElementById('score').innerText = player.score;
+            let best = localStorage.getItem('best') || 0;
+            if(player.score > best) { localStorage.setItem('best', player.score); best = player.score; }
+            document.getElementById('best').innerText = best;
+        }
+        function handleMove(dir) { player.pos.x += dir; if(collide(arena, player)) player.pos.x -= dir; }
+        function handleRotate() { 
+            const matrix = player.matrix;
+            for (let y = 0; y < matrix.length; ++y) {
+                for (let x = 0; x < y; ++x) [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+            }
+            matrix.forEach(row => row.reverse());
+            if(collide(arena, player)) matrix.forEach(row => row.reverse()); 
+        }
+        function handleHardDrop() { while(!collide(arena, player)) player.pos.y++; player.pos.y--; merge(arena, player); playerReset(); arenaSweep(); }
+        function pauseGame() { isPaused = !isPaused; }
+        function resetGame() { location.reload(); }
+
+        const arena = Array.from({length: 20}, () => new Array(12).fill(0));
+        const player = { pos: {x: 0, y: 0}, matrix: null, score: 0 };
+        let dropCounter = 0, lastTime = 0;
+
+        playerReset(); updateScore(); update();
+        window.addEventListener('touchstart', () => { if(soundOn) document.getElementById('bgMusic').play(); }, {once:true});
+    </script>
+</body>
+</html 
